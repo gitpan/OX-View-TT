@@ -1,0 +1,197 @@
+package OX::View::TT;
+BEGIN {
+  $OX::View::TT::AUTHORITY = 'cpan:DOY';
+}
+{
+  $OX::View::TT::VERSION = '0.01';
+}
+use Moose;
+# ABSTRACT: View wrapper class for TT renderers
+
+use MooseX::Types::Path::Class;
+use Template;
+
+
+has 'template_root' => (
+    is       => 'ro',
+    isa      => 'Path::Class::Dir',
+    coerce   => 1,
+    required => 1,
+);
+
+has 'template_config' => (
+    is      => 'ro',
+    isa     => 'HashRef',
+    lazy    => 1,
+    default => sub { +{} },
+);
+
+has 'tt' => (
+    is      => 'ro',
+    isa     => 'Template',
+    lazy    => 1,
+    default => sub {
+        my $self = shift;
+        Template->new(
+            INCLUDE_PATH => $self->template_root,
+            %{ $self->template_config }
+        )
+    }
+);
+
+sub _build_template_params {
+    my ($self, $r, $params) = @_;
+    return +{
+        base    => $r->script_name,
+        uri_for => sub { $r->uri_for(@_) },
+        m       => $r->mapping,
+        %{ $params || {} }
+    }
+}
+
+
+sub render {
+    my ($self, $r, $template, $params) = @_;
+    my $out = '';
+    $self->tt->process(
+        $template,
+        $self->_build_template_params( $r, $params ),
+        \$out
+    ) || confess $self->tt->error;
+    $out;
+}
+
+
+sub template {
+    my $self = shift;
+    my ($r) = @_;
+
+    my %params = %{ $r->mapping };
+    confess("Must supply a 'template' parameter")
+        unless exists $params{template};
+
+    return $self->render($r, $params{template});
+}
+
+__PACKAGE__->meta->make_immutable;
+no Moose;
+
+
+1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+OX::View::TT - View wrapper class for TT renderers
+
+=head1 VERSION
+
+version 0.01
+
+=head1 SYNOPSIS
+
+  package MyApp;
+  use OX;
+
+  has view => (
+      is           => 'ro',
+      isa          => 'OX::View::TT',
+      dependencies => ['template_root'],
+  );
+
+=head1 DESCRIPTION
+
+This is a very thin wrapper around L<Template> which exposes some OX
+functionality to your template files. Templates rendered with this class will
+have access to these additional variables:
+
+=over 4
+
+=item C<base>
+
+The base URL that this app is hosted at (C<SCRIPT_NAME>).
+
+=item C<uri_for>
+
+A function which forwards its arguments to the C<uri_for> method in
+L<OX::Request>.
+
+=item C<m>
+
+The hashref of match variables for the current route (equivalent to the
+C<mapping> method on the L<OX::Request> object).
+
+=back
+
+=head1 METHODS
+
+=head2 C<< render($r, $template, $params) >>
+
+Renders a template, and returns a string containing the contents. C<$r> is the
+request object, C<$template> is the name of the template, and C<$params> are
+extra variables to pass to the template.
+
+=head2 C<< template($r) >>
+
+This is an action method which can be used directly as a route endpoint:
+
+  route '/about' => 'view.template', (
+      template => 'about.tt',
+  );
+
+=head1 BUGS
+
+No known bugs.
+
+Please report any bugs through RT: email
+C<bug-ox-view-tt at rt.cpan.org>, or browse to
+L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=OX-View-TT>.
+
+=head1 SEE ALSO
+
+L<OX>
+
+=head1 SUPPORT
+
+You can find this documentation for this module with the perldoc command.
+
+    perldoc OX::View::TT
+
+You can also look for information at:
+
+=over 4
+
+=item * AnnoCPAN: Annotated CPAN documentation
+
+L<http://annocpan.org/dist/OX-View-TT>
+
+=item * CPAN Ratings
+
+L<http://cpanratings.perl.org/d/OX-View-TT>
+
+=item * RT: CPAN's request tracker
+
+L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=OX-View-TT>
+
+=item * Search CPAN
+
+L<http://search.cpan.org/dist/OX-View-TT>
+
+=back
+
+=head1 AUTHOR
+
+Jesse Luehrs <doy at cpan dot org>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is Copyright (c) 2013 by Jesse Luehrs.
+
+This is free software, licensed under:
+
+  The MIT (X11) License
+
+=cut
