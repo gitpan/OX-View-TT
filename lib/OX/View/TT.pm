@@ -2,9 +2,7 @@ package OX::View::TT;
 BEGIN {
   $OX::View::TT::AUTHORITY = 'cpan:DOY';
 }
-{
-  $OX::View::TT::VERSION = '0.01';
-}
+$OX::View::TT::VERSION = '0.02';
 use Moose;
 # ABSTRACT: View wrapper class for TT renderers
 
@@ -39,9 +37,16 @@ has 'tt' => (
     }
 );
 
-sub _build_template_params {
+has template_params => (
+    is => 'ro',
+    isa => 'HashRef',
+    default => sub { {} },
+);
+
+sub _get_all_template_params {
     my ($self, $r, $params) = @_;
     return +{
+        %{ $self->template_params },
         base    => $r->script_name,
         uri_for => sub { $r->uri_for(@_) },
         m       => $r->mapping,
@@ -55,7 +60,7 @@ sub render {
     my $out = '';
     $self->tt->process(
         $template,
-        $self->_build_template_params( $r, $params ),
+        $self->_get_all_template_params( $r, $params ),
         \$out
     ) || confess $self->tt->error;
     $out;
@@ -70,7 +75,7 @@ sub template {
     confess("Must supply a 'template' parameter")
         unless exists $params{template};
 
-    return $self->render($r, $params{template});
+    return $self->render($r, $params{template}, \%params);
 }
 
 __PACKAGE__->meta->make_immutable;
@@ -83,30 +88,43 @@ __END__
 
 =pod
 
+=encoding UTF-8
+
 =head1 NAME
 
 OX::View::TT - View wrapper class for TT renderers
 
 =head1 VERSION
 
-version 0.01
+version 0.02
 
 =head1 SYNOPSIS
 
   package MyApp;
   use OX;
 
+  has 'template_params' => (
+      block => sub {
+          my $s = shift;
+          return {
+              some_scalar => 'value',
+              some_array => ['one', 'two'],
+          };
+      },
+  );
+
   has view => (
       is           => 'ro',
       isa          => 'OX::View::TT',
-      dependencies => ['template_root'],
+      dependencies => ['template_root', 'template_params'],
   );
 
 =head1 DESCRIPTION
 
 This is a very thin wrapper around L<Template> which exposes some OX
-functionality to your template files. Templates rendered with this class will
-have access to these additional variables:
+functionality to your template files. It can be passed a template_params
+dependency, containing variables that will be passed to the template. Templates
+rendered with this class will have access to these additional variables:
 
 =over 4
 
@@ -146,9 +164,8 @@ This is an action method which can be used directly as a route endpoint:
 
 No known bugs.
 
-Please report any bugs through RT: email
-C<bug-ox-view-tt at rt.cpan.org>, or browse to
-L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=OX-View-TT>.
+Please report any bugs to GitHub Issues at
+L<https://github.com/doy/ox-view-tt/issues>.
 
 =head1 SEE ALSO
 
@@ -164,31 +181,31 @@ You can also look for information at:
 
 =over 4
 
-=item * AnnoCPAN: Annotated CPAN documentation
+=item * MetaCPAN
 
-L<http://annocpan.org/dist/OX-View-TT>
+L<https://metacpan.org/release/OX-View-TT>
 
-=item * CPAN Ratings
+=item * Github
 
-L<http://cpanratings.perl.org/d/OX-View-TT>
+L<https://github.com/doy/ox-view-tt>
 
 =item * RT: CPAN's request tracker
 
 L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=OX-View-TT>
 
-=item * Search CPAN
+=item * CPAN Ratings
 
-L<http://search.cpan.org/dist/OX-View-TT>
+L<http://cpanratings.perl.org/d/OX-View-TT>
 
 =back
 
 =head1 AUTHOR
 
-Jesse Luehrs <doy at cpan dot org>
+Jesse Luehrs <doy@tozt.net>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is Copyright (c) 2013 by Jesse Luehrs.
+This software is Copyright (c) 2014 by Jesse Luehrs.
 
 This is free software, licensed under:
 
